@@ -1,76 +1,154 @@
+# 🚀 DropLink - Secure File Sharing
 
-<table>
-  <tr>
-    <td><img width="412" alt="Screenshot 2024-01-03 at 11 39 56 PM" src="https://github.com/MridulTailor/filesharingapp/assets/71081929/16628994-a301-4c10-be90-e4012e056b0b"></td>
-    <td><img width="412" alt="Screenshot 2024-01-03 at 11 40 08 PM" src="https://github.com/MridulTailor/filesharingapp/assets/71081929/ea9e624e-c88f-4dfc-90ac-3dd7e90b9ddc"></td>
-  </tr>
-  <tr>
-    <td><img width="412" alt="Screenshot 2024-01-03 at 11 37 07 PM" src="https://github.com/MridulTailor/filesharingapp/assets/71081929/eeb92366-ab96-49e3-b133-cb17d01b5415"></td>
-    <td><img width="412" alt="Screenshot 2024-01-03 at 11 40 34 PM" src="https://github.com/MridulTailor/filesharingapp/assets/71081929/435b6721-4f6b-40e8-9816-f311782f9231"></td>
-  </tr>
-</table>
+A modern, full-stack file sharing application with password protection, expiration controls, and QR code generation.
 
+![Tech Stack](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
 
-# WildShare
+![Backend CI](https://github.com/MridulTailor/filesharingapp/workflows/Backend%20CI/badge.svg)
+![Frontend CI](https://github.com/MridulTailor/filesharingapp/workflows/Frontend%20CI/badge.svg)
 
-WildShare is a simple file-sharing application built with React and Node.js. Users can upload images, and the application provides a shareable link for each uploaded file.
+## ✨ Features
 
-## Features
+- 📤 **Drag & Drop Upload** - Intuitive file upload interface
+- 🔒 **Password Protection** - Optional password encryption with Argon2
+- ⏱️ **Auto-Expiration** - Files automatically delete after set time
+- 📊 **Download Limits** - Control maximum download counts
+- 📱 **QR Code Sharing** - Instant mobile sharing via QR codes
+- 👁️ **File Preview** - In-browser preview for images and PDFs
+- 🌓 **Dark/Light Mode** - Theme toggle with persistent preferences
+- 🎨 **Modern UI** - Responsive design with Tailwind CSS
 
-- **File Upload**: Easily upload image files through an intuitive interface.
-- **Copy Link**: Copy the generated link to share with others.
-- **Progress Bar**: Track the progress of file uploads.
-- **Responsive Design**: Works seamlessly on various devices.
+## 🛠️ Tech Stack
 
-## Technologies Used
+### Backend
+- **FastAPI** - High-performance async Python web framework
+- **SQLModel** - SQL database ORM with Pydantic validation
+- **SQLite** - Lightweight database for development
+- **Argon2** - Secure password hashing
+- **Passlib** - Password context management
 
-- **Frontend**:
+### Frontend
+- **React 19** - Modern UI library
+- **TypeScript** - Type-safe JavaScript
+- **Vite** - Lightning-fast build tool
+- **TanStack Router** - Type-safe routing
+- **TanStack Query** - Server state management
+- **Tailwind CSS** - Utility-first CSS framework
+- **React Dropzone** - File upload component
+- **QRCode.react** - QR code generation
 
-  - React
-  - Material-UI
+## 🚀 Quick Start
 
-- **Backend**:
-  - Node.js
-  - Express
-  - MongoDB
-  - Multer (file upload)
+### Prerequisites
+- Python 3.13+
+- Node.js 18+
+- Pipenv
 
-## Getting Started
+### Backend Setup
+```bash
+cd backend
 
-### Configuration
+# Copy environment template
+cp .env.example .env
+# Edit .env with your configuration
 
-1. Create a `.env` file in the `backend` directory to configure your MongoDB connection and other environment variables:
+# Install dependencies
+pipenv install
 
-   ```env
-   MONGO_URI = <your-mongodb-uri>
+# Run development server
+pipenv run uvicorn main:app --port 3001 --reload
+```
 
-   APP_BASE_URL = <your-frontend-url>
-   ```
+API will be available at `http://localhost:3001`
+- **Swagger Docs**: `http://localhost:3001/docs`
+- **ReDoc**: `http://localhost:3001/redoc`
 
-2. Update the frontend API endpoint in `frontend/src/Constants.js`:
+### Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-   ```jsx
-   class Constants {
-     static API_URL = "<your-api-url>";
-   }
-   ```
+Frontend will be available at `http://localhost:5173`
 
-   Make sure to import the `Constants` class and use `${Constants.API_URL}` in place of the API URL.
+## 📚 API Documentation
 
-### Running the Application
+Interactive API documentation is auto-generated and available at:
+- **Swagger UI**: http://localhost:3001/docs
+- **ReDoc**: http://localhost:3001/redoc
 
-1. Start the backend server:
+### Key Endpoints
 
-   ```bash
-   cd backend
-   npm index.js
-   ```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/files` | Upload file with optional protection |
+| `GET` | `/files/{uuid}` | Get file metadata |
+| `GET` | `/files/download/{uuid}` | Download file |
+| `GET` | `/files/preview/{uuid}` | Preview image/PDF |
 
-2. Start the frontend application:
+## 🧪 Testing
 
-   ```bash
-   cd frontend
-   npm start
-   ```
+### Run Backend Tests
+```bash
+cd backend
+pipenv run pytest
+```
 
-3. Open your browser and navigate to `http://localhost:3000` to use WildShare.
+### Run Frontend Tests
+```bash
+cd frontend
+npm test
+```
+
+## 📁 Project Structure
+
+```
+filesharingapp/
+├── backend/
+│   ├── main.py              # FastAPI application
+│   ├── database.py          # SQLModel configuration
+│   ├── models.py            # Database models
+│   ├── routes/
+│   │   └── files.py         # File endpoints
+│   ├── tests/               # Backend tests
+│   └── uploads/             # File storage
+└── frontend/
+    ├── src/
+    │   ├── pages/           # Page components
+    │   ├── components/      # Reusable components
+    │   ├── context/         # React contexts
+    │   └── routes/          # Route definitions
+    └── public/              # Static assets
+```
+
+## 🔐 Security Features
+
+- **Argon2 Password Hashing** - Industry-standard password security
+- **Password-Protected Downloads** - Optional file encryption
+- **Auto-Expiration** - Files automatically deleted after timeout
+- **Download Limits** - Restrict number of downloads per file
+- **Input Validation** - SQLModel/Pydantic validation on all inputs
+
+## 🌍 Environment Variables
+
+The backend requires configuration via environment variables. Copy `.env.example` to `.env` in the `backend/` directory:
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+**Required Variables:**
+- `APP_BASE_URL` - Base URL for the application (default: `http://localhost:3001`)
+- `PORT` - Port for the backend server (default: `3001`)
+
+**Optional Variables:**
+- `MONGO_CONNECTION_URL` - MongoDB connection string (if using MongoDB)
+- `DATABASE_URL` - SQLite database path (default: `sqlite:///./database.db`)
+- `UPLOAD_DIR` - Directory for uploaded files (default: `./uploads`)
+- `MAX_FILE_SIZE_MB` - Maximum file size in MB (default: `100`)
+- `CORS_ORIGINS` - Allowed CORS origins (default: `http://localhost:5173`)
