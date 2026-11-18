@@ -1,7 +1,22 @@
 import { useEffect, useState } from "react";
 import { useParams } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
 import { api } from "../api";
+import {
+  Download,
+  Eye,
+  FileText,
+  LockKeyhole,
+  X,
+} from "lucide-react";
+
+type FileInfo = {
+  filename: string;
+  size: number;
+  createdAt: string;
+  downloadLink: string;
+  is_protected: boolean;
+};
 
 export const DownloadPage = () => {
   const { uuid } = useParams({ from: '/files/$uuid' });
@@ -9,6 +24,9 @@ export const DownloadPage = () => {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     return () => {
@@ -18,14 +36,33 @@ export const DownloadPage = () => {
     };
   }, [previewUrl]);
 
-  const { data: fileInfo, isLoading, error } = useQuery({
-    queryKey: ["file", uuid],
-    queryFn: async () => {
-      const response = await api.get(`/files/${uuid}`);
-      return response.data;
-    },
-    retry: false,
-  });
+  useEffect(() => {
+    let active = true;
+
+    const loadFile = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await api.get(`/files/${uuid}`);
+        if (active) {
+          setFileInfo(response.data);
+        }
+      } catch (loadError) {
+        if (active) {
+          setError(loadError);
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadFile();
+    return () => {
+      active = false;
+    };
+  }, [uuid]);
 
   // Check if file can be previewed
   const canPreview = fileInfo?.filename && [
@@ -66,12 +103,15 @@ export const DownloadPage = () => {
                 window.location.href = fileInfo.downloadLink;
             }
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Download error:", err);
-            if (err.response?.status === 401) {
+            if (axios.isAxiosError(err) && err.response?.status === 401) {
                 setDownloadError("Incorrect password.");
-            } else if (err.response?.status === 404) {
-                setDownloadError(err.response.data.detail || "File not found or expired.");
+            } else if (axios.isAxiosError(err) && err.response?.status === 404) {
+                const detail = (
+                  err.response.data as { detail?: string } | undefined
+                )?.detail;
+                setDownloadError(detail || "File not found or expired.");
             } else {
                 setDownloadError("Download failed.");
             }
@@ -100,10 +140,10 @@ export const DownloadPage = () => {
           window.URL.revokeObjectURL(previewUrl);
         }
         setPreviewUrl(nextPreviewUrl);
-      } catch (err: any) {
+      } catch (err: unknown) {
         setShowPreview(false);
         setDownloadError(
-          err.response?.status === 401
+          axios.isAxiosError(err) && err.response?.status === 401
             ? "Incorrect password."
             : "Failed to load preview",
         );
@@ -118,44 +158,61 @@ export const DownloadPage = () => {
   };
 
   return (
-    <div className="w-full max-w-lg">
-      <div className="glass-card p-8 text-center transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/20">
-        <div className="mb-6 relative inline-block">
-          <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 rounded-full animate-pulse"></div>
-          <div className="text-7xl relative z-10 animate-float">📦</div>
-        </div>
+    <div className="w-full max-w-2xl py-10 sm:py-16">
+      <div className="mb-8">
+        <p className="text-accent mb-3 text-sm font-medium">Incoming transfer</p>
+        <h1 className="text-primary text-3xl font-semibold tracking-tight">
+          File ready
+        </h1>
+      </div>
 
-        <h2 className="text-3xl font-bold mb-2 text-white">Ready to Download</h2>
-        <p className="text-slate-400 mb-8">Your file is served hot and fresh.</p>
-
+      <div className="transfer-receipt p-5 sm:p-8">
         {isLoading ? (
-            <div className="flex justify-center items-center space-x-2 text-cyan-400">
-                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+            <div className="text-muted flex h-48 items-center justify-center text-sm">
+                Loading transfer
             </div>
         ) : error ? (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400">
-                <p className="font-semibold">Oops! Link Expired or Invalid</p>
-                <p className="text-sm mt-1">{(error as any).response?.data?.detail || "This file might have been deleted or never existed."}</p>
+            <div className="rounded-xl border border-[#d66a62]/20 bg-[#d66a62]/10 p-5 text-[#a94b45] light:text-[#7d2f2a]">
+                <p className="font-medium">Transfer unavailable</p>
+                <p className="text-sm mt-1">
+                  {axios.isAxiosError(error)
+                    ? (error.response?.data as { detail?: string } | undefined)?.detail ||
+                      "This transfer may have expired or reached its download limit."
+                    : "This transfer may have expired or reached its download limit."}
+                </p>
             </div>
         ) : fileInfo ? (
-          <div className="space-y-6 animate-fade-in">
-            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 text-left">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-slate-400 text-sm uppercase tracking-wider">Filename</span>
-                    <span className="text-cyan-400 text-xs font-mono bg-cyan-400/10 px-2 py-1 rounded">
-                        {(fileInfo.size / 1024 / 1024).toFixed(2)} MB
+          <div className="space-y-6">
+            <div className="hairline flex items-start justify-between border-b pb-5">
+                <div className="flex min-w-0 items-center gap-3">
+                    <span className="text-accent hairline grid h-10 w-10 shrink-0 place-items-center rounded-lg border">
+                        <FileText size={18} strokeWidth={1.5} />
                     </span>
+                    <div className="min-w-0">
+                        <p className="text-primary truncate font-medium">{fileInfo.filename}</p>
+                        <p className="text-muted mt-1 font-mono text-xs">
+                            {(fileInfo.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                    </div>
                 </div>
-                <p className="text-white font-medium text-lg truncate" title={fileInfo.filename}>
-                    {fileInfo.filename}
-                </p>
-                <div className="mt-4 pt-4 border-t border-slate-700 flex justify-between items-center">
-                    <span className="text-slate-500 text-xs">Uploaded</span>
-                    <span className="text-slate-400 text-sm">
-                        {new Date(fileInfo.createdAt).toLocaleDateString()}
+                {fileInfo.is_protected && (
+                    <span className="text-secondary hairline flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs">
+                        <LockKeyhole size={14} strokeWidth={1.5} />
+                        Protected
                     </span>
+                )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <p className="text-muted text-xs">Uploaded</p>
+                    <p className="text-secondary mt-2 font-mono text-sm">
+                        {new Date(fileInfo.createdAt).toLocaleDateString()}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-muted text-xs">Transfer</p>
+                    <p className="text-accent mt-2 font-mono text-sm">{uuid.slice(0, 8).toUpperCase()}</p>
                 </div>
             </div>
 
@@ -166,18 +223,19 @@ export const DownloadPage = () => {
                   onClick={handlePreview}
                   className="btn-secondary w-full text-sm"
                 >
-                  {showPreview ? "Hide Preview" : "Show Preview"}
+                  {showPreview ? <X size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
+                  {showPreview ? "Close preview" : "Preview"}
                 </button>
                 
                 {showPreview && (
-                  <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                  <div className="rounded-xl border border-white/[0.08] bg-black/10 p-3 light:border-[#dfe3dc] light:bg-[#f4f5f1]">
                     {!password && fileInfo.is_protected ? (
-                      <p className="text-slate-400 text-sm text-center">Enter password to preview</p>
+                      <p className="text-muted py-8 text-center text-sm">Enter the password to preview</p>
                     ) : previewUrl && isImage ? (
                       <img
                         src={previewUrl}
                         alt={fileInfo.filename}
-                        className="w-full rounded-lg"
+                        className="max-h-[480px] w-full rounded-lg object-contain"
                         onError={() => setDownloadError("Failed to load preview")}
                       />
                     ) : previewUrl && isPDF ? (
@@ -193,20 +251,20 @@ export const DownloadPage = () => {
             )}
 
             {fileInfo.is_protected && (
-                <div className="text-left">
-                    <label className="block text-slate-400 text-xs mb-1">Password Required</label>
+                <div>
+                    <label className="text-muted mb-2 block text-xs">Password</label>
                     <input 
                         type="password" 
-                        placeholder="Enter password to download"
+                        placeholder="Enter transfer password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
+                        className="field"
                     />
                 </div>
             )}
             
             {downloadError && (
-                <div className="text-red-400 text-sm bg-red-400/10 p-2 rounded border border-red-400/20">
+                <div className="rounded-lg border border-[#d66a62]/20 bg-[#d66a62]/10 p-3 text-sm text-[#a94b45] light:text-[#7d2f2a]">
                     {downloadError}
                 </div>
             )}
@@ -215,8 +273,8 @@ export const DownloadPage = () => {
               onClick={handleDownload}
               className="w-full btn-primary flex items-center justify-center gap-2 group"
             >
-              <span>{fileInfo.is_protected ? "Unlock & Download" : "Download Now"}</span>
-              <span className="group-hover:translate-y-1 transition-transform">↓</span>
+              <Download size={16} strokeWidth={1.5} />
+              {fileInfo.is_protected ? "Unlock and download" : "Download file"}
             </button>
           </div>
         ) : null}
