@@ -1,15 +1,36 @@
-from sqlmodel import SQLModel, create_engine, Session
-from typing import Generator
+import os
+from pymongo import AsyncMongoClient
+from pymongo.asynchronous.database import AsyncDatabase
+from dotenv import load_dotenv
 
-SQLITE_FILE_NAME = "database.db"
-sqlite_url = f"sqlite:///{SQLITE_FILE_NAME}"
+load_dotenv()
+_client: AsyncMongoClient | None = None
+_database: AsyncDatabase | None = None
 
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, connect_args=connect_args)
+async def connect_to_mongodb() -> None:
+    global _client, _database
 
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
+    mongo_url = os.environ["MONGODB_URL"]
+    database_name = os.environ["MONGODB_DATABASE"]
 
-def get_session() -> Generator[Session, None, None]:
-    with Session(engine) as session:
-        yield session
+    _client = AsyncMongoClient(mongo_url)
+    await _client.admin.command("ping")
+    _database = _client.get_database(database_name)
+
+    await _database.files.create_index("uuid", unique=True)
+    await _database.files.create_index("expires_at", expireAfterSeconds=0)
+
+async def close_mongodb_connection() -> None:
+    global _client, _database
+
+    if _client is not None:
+        await _client.close()
+
+    _client = None
+    _database = None
+
+def get_database() -> AsyncDatabase:
+    if _database is None:
+        raise RuntimeError("MongoDB has not been initialized")
+
+    return _database

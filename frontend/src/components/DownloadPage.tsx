@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
@@ -8,6 +8,15 @@ export const DownloadPage = () => {
   const [password, setPassword] = useState("");
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        window.URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const { data: fileInfo, isLoading, error } = useQuery({
     queryKey: ["file", uuid],
@@ -37,21 +46,9 @@ export const DownloadPage = () => {
         }
 
         try {
-            // Construct URL with password if needed
-            let url = fileInfo.downloadLink;
-            if (password) {
-                url += `?password=${encodeURIComponent(password)}`;
-            }
-            
-            // Trigger download by navigating (or using a hidden iframe/link)
-            // For protected files, we might need to handle the response directly if it's an API call, 
-            // but since the backend returns a file stream, setting window.location.href works 
-            // IF the browser handles the 401 correctly (it might show a browser prompt or just fail).
-            // Better approach for protected files: fetch blob and download.
-            
             if (fileInfo.is_protected) {
                 const response = await api.get(`/files/download/${uuid}`, {
-                    params: { password },
+                    headers: { "X-File-Password": password },
                     responseType: 'blob'
                 });
                 
@@ -79,6 +76,44 @@ export const DownloadPage = () => {
                 setDownloadError("Download failed.");
             }
         }
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!showPreview) {
+      setShowPreview(true);
+      setDownloadError(null);
+
+      if (fileInfo?.is_protected && !password) {
+        return;
+      }
+
+      try {
+        const response = await api.get(`/files/preview/${uuid}`, {
+          headers: fileInfo?.is_protected
+            ? { "X-File-Password": password }
+            : undefined,
+          responseType: "blob",
+        });
+        const nextPreviewUrl = window.URL.createObjectURL(response.data);
+        if (previewUrl) {
+          window.URL.revokeObjectURL(previewUrl);
+        }
+        setPreviewUrl(nextPreviewUrl);
+      } catch (err: any) {
+        setShowPreview(false);
+        setDownloadError(
+          err.response?.status === 401
+            ? "Incorrect password."
+            : "Failed to load preview",
+        );
+      }
+    } else {
+      setShowPreview(false);
+      if (previewUrl) {
+        window.URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
     }
   };
 
@@ -128,7 +163,7 @@ export const DownloadPage = () => {
             {canPreview && (
               <div className="space-y-2">
                 <button
-                  onClick={() => setShowPreview(!showPreview)}
+                  onClick={handlePreview}
                   className="btn-secondary w-full text-sm"
                 >
                   {showPreview ? "Hide Preview" : "Show Preview"}
@@ -138,16 +173,16 @@ export const DownloadPage = () => {
                   <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
                     {!password && fileInfo.is_protected ? (
                       <p className="text-slate-400 text-sm text-center">Enter password to preview</p>
-                    ) : isImage ? (
+                    ) : previewUrl && isImage ? (
                       <img
-                        src={`http://localhost:3001/files/preview/${uuid}${password ? `?password=${encodeURIComponent(password)}` : ''}`}
+                        src={previewUrl}
                         alt={fileInfo.filename}
                         className="w-full rounded-lg"
                         onError={() => setDownloadError("Failed to load preview")}
                       />
-                    ) : isPDF ? (
+                    ) : previewUrl && isPDF ? (
                       <iframe
-                        src={`http://localhost:3001/files/preview/${uuid}${password ? `?password=${encodeURIComponent(password)}` : ''}`}
+                        src={previewUrl}
                         className="w-full h-96 rounded-lg"
                         title="PDF Preview"
                       />

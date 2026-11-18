@@ -163,13 +163,6 @@ env/
 .tox/
 htmlcov/
 
-# Backend specific
-backend/database.db
-backend/*.db
-backend/uploads/
-*.sqlite
-*.sqlite3
-
 # IDEs
 .vscode/
 .idea/

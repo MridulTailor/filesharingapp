@@ -1,28 +1,40 @@
-import os
-import time
-from datetime import datetime
-from sqlmodel import Session, select
-from database import engine
-from models import File
+import asyncio
+from datetime import datetime, timezone
 
-def cleanup_expired_files():
-    with Session(engine) as session:
-        statement = select(File).where(File.expires_at < datetime.utcnow())
-        expired_files = session.exec(statement).all()
-        
-        for file in expired_files:
-            print(f"Deleting expired file: {file.filename}")
-            try:
-                if os.path.exists(file.path):
-                    os.remove(file.path)
-                session.delete(file)
-            except Exception as e:
-                print(f"Error deleting file {file.filename}: {e}")
-        
-        session.commit()
+from database import close_mongodb_connection, connect_to_mongodb, get_database
+from storage import delete_object
+
+
+async def cleanup_expired_files() -> int:
+    db = get_database()
+    deleted_count = 0
+    expired_files = db.files.find(
+        {"expires_at": {"$lt": datetime.now(timezone.utc)}}
+    )
+
+    async for file in expired_files:
+        object_key = file.get("object_key")
+        try:
+            if object_key:
+                await delete_object(object_key)
+            await db.files.delete_one({"uuid": file["uuid"]})
+            deleted_count += 1
+        except Exception as exc:
+            print(f"Error deleting file {file.get('filename', file['uuid'])}: {exc}")
+
+    return deleted_count
+
+
+async def cleanup_loop(interval_seconds: int = 60) -> None:
+    await connect_to_mongodb()
+    try:
+        while True:
+            deleted_count = await cleanup_expired_files()
+            print(f"Cleanup complete: deleted {deleted_count} expired files")
+            await asyncio.sleep(interval_seconds)
+    finally:
+        await close_mongodb_connection()
+
 
 if __name__ == "__main__":
-    print("Starting cleanup service...")
-    while True:
-        cleanup_expired_files()
-        time.sleep(60) # Run every minute
+    asyncio.run(cleanup_loop())

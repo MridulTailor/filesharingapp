@@ -28,38 +28,44 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.13'
-        cache: 'pipenv'
-    
-    - name: Install Pipenv
-      run: |
-        python -m pip install --upgrade pip
-        pip install pipenv
-    
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+        cache-dependency-glob: "backend/uv.lock"
+
     - name: Install dependencies
       run: |
-        pipenv install --dev --deploy
-    
+        uv sync --locked --dev
+
     - name: Run tests with pytest
       run: |
-        pipenv run pytest -v --tb=short
+        uv run pytest -v --tb=short
       env:
         APP_BASE_URL: http://localhost:3001
         PORT: 3001
-    
+        MONGODB_URL: ${{ secrets.MONGODB_TEST_URL }}
+        MONGODB_DATABASE: filesharing_test
+        MONGODB_TEST_DATABASE: filesharing_test
+
     - name: Generate coverage report
       if: success()
       run: |
-        pipenv run pytest --cov=. --cov-report=xml --cov-report=term
+        uv run pytest --cov=. --cov-report=xml --cov-report=term
       continue-on-error: true
       env:
         APP_BASE_URL: http://localhost:3001
         PORT: 3001
-    
+        MONGODB_URL: ${{ secrets.MONGODB_TEST_URL }}
+        MONGODB_DATABASE: filesharing_test
+        MONGODB_TEST_DATABASE: filesharing_test
+
     - name: Upload coverage reports
       if: success()
       uses: codecov/codecov-action@v4
       with:
-        file: ./backend/coverage.xml
+        file: ./coverage.xml
         flags: backend
         name: backend-coverage
       continue-on-error: true

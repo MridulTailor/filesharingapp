@@ -25,8 +25,10 @@ A modern, full-stack file sharing application with password protection, expirati
 
 ### Backend
 - **FastAPI** - High-performance async Python web framework
-- **SQLModel** - SQL database ORM with Pydantic validation
-- **SQLite** - Lightweight database for development
+- **MongoDB** - Document database for file metadata
+- **PyMongo** - Async MongoDB database driver
+- **Cloudflare R2** - S3-compatible object storage for uploaded files
+- **Pydantic** - Request and response validation
 - **Argon2** - Secure password hashing
 - **Passlib** - Password context management
 
@@ -45,7 +47,7 @@ A modern, full-stack file sharing application with password protection, expirati
 ### Prerequisites
 - Python 3.13+
 - Node.js 18+
-- Pipenv
+- uv
 
 ### Backend Setup
 ```bash
@@ -56,10 +58,10 @@ cp .env.example .env
 # Edit .env with your configuration
 
 # Install dependencies
-pipenv install
+uv sync
 
 # Run development server
-pipenv run uvicorn main:app --port 3001 --reload
+uv run uvicorn main:app --port 3001 --reload
 ```
 
 API will be available at `http://localhost:3001`
@@ -95,7 +97,7 @@ Interactive API documentation is auto-generated and available at:
 ### Run Backend Tests
 ```bash
 cd backend
-pipenv run pytest
+uv run pytest
 ```
 
 ### Run Frontend Tests
@@ -110,12 +112,13 @@ npm test
 filesharingapp/
 ├── backend/
 │   ├── main.py              # FastAPI application
-│   ├── database.py          # SQLModel configuration
-│   ├── models.py            # Database models
+│   ├── database.py          # MongoDB lifecycle
+│   ├── models.py            # Pydantic response models
+│   ├── storage.py           # Cloudflare R2 storage
+│   ├── cleanup.py           # Expired-file cleanup
 │   ├── routes/
 │   │   └── files.py         # File endpoints
-│   ├── tests/               # Backend tests
-│   └── uploads/             # File storage
+│   └── tests/               # Backend tests
 └── frontend/
     ├── src/
     │   ├── pages/           # Page components
@@ -131,7 +134,7 @@ filesharingapp/
 - **Password-Protected Downloads** - Optional file encryption
 - **Auto-Expiration** - Files automatically deleted after timeout
 - **Download Limits** - Restrict number of downloads per file
-- **Input Validation** - SQLModel/Pydantic validation on all inputs
+- **Input Validation** - Pydantic validation on API responses and inputs
 
 ## 🌍 Environment Variables
 
@@ -143,12 +146,14 @@ cp .env.example .env
 ```
 
 **Required Variables:**
+- `MONGODB_URL` - MongoDB connection string
+- `MONGODB_DATABASE` - MongoDB database name
+- `MONGODB_TEST_DATABASE` - MongoDB database used by tests
 - `APP_BASE_URL` - Base URL for the application (default: `http://localhost:3001`)
 - `PORT` - Port for the backend server (default: `3001`)
-
-**Optional Variables:**
-- `MONGO_CONNECTION_URL` - MongoDB connection string (if using MongoDB)
-- `DATABASE_URL` - SQLite database path (default: `sqlite:///./database.db`)
-- `UPLOAD_DIR` - Directory for uploaded files (default: `./uploads`)
-- `MAX_FILE_SIZE_MB` - Maximum file size in MB (default: `100`)
+- `R2_ENDPOINT` - Cloudflare R2 S3-compatible endpoint
+- `R2_ACCESS_KEY_ID` - R2 API access key ID
+- `R2_SECRET_ACCESS_KEY` - R2 API secret access key
+- `R2_BUCKET` - R2 bucket name
+- `R2_REGION` - R2 signing region (default: `auto`)
 - `CORS_ORIGINS` - Allowed CORS origins (default: `http://localhost:5173`)

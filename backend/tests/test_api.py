@@ -1,168 +1,262 @@
-import pytest
-from fastapi.testclient import TestClient
-from sqlmodel import Session, create_engine, SQLModel
-from sqlmodel.pool import StaticPool
 import os
-import tempfile
 from io import BytesIO
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from dotenv import load_dotenv
+from httpx import ASGITransport, AsyncClient
+from pymongo import AsyncMongoClient
 
 from main import app
-from database import get_session
-from models import File as FileModel
+from database import get_database
 
 
-# Test database setup
-@pytest.fixture(name="session")
-def session_fixture():
-    """Create a fresh database for each test"""
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+load_dotenv()
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.fixture
+def mongo_database():
+    mongo_url = os.environ["MONGODB_URL"]
+    database_name = os.getenv(
+        "MONGODB_TEST_DATABASE",
+        "filesharing_test",
     )
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
-        yield session
+    client = AsyncMongoClient(mongo_url)
+    database = client.get_database(database_name)
+    return client, database
 
 
-@pytest.fixture(name="client")
-def client_fixture(session: Session):
-    """Create test client with test database"""
-    def get_session_override():
-        return session
+@pytest.fixture
+async def client(mongo_database):
+    client, database = mongo_database
+    await database.files.delete_many({})
 
-    app.dependency_overrides[get_session] = get_session_override
-    client = TestClient(app)
-    yield client
+    app.dependency_overrides[get_database] = lambda: database
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        follow_redirects=False,
+    ) as http_client:
+        yield http_client, database
+
     app.dependency_overrides.clear()
+    await database.files.delete_many({})
+    await client.close()
 
 
-# Test 1: Health check / Root endpoint
-def test_read_root(client: TestClient):
-    """Test that the API is running"""
-    response = client.get("/")
-    assert response.status_code in [200, 404]  # May not have root endpoint
+@pytest.mark.anyio
+async def test_read_root(client):
+    http_client, _ = client
+    response = await http_client.get("/")
+    assert response.status_code in [200, 404]
 
 
-# Test 2: File upload without options
-def test_upload_file_simple(client: TestClient):
-    """Test basic file upload"""
-    file_content = b"Test file content"
-    files = {"myFile": ("test.txt", BytesIO(file_content), "text/plain")}
-    
-    response = client.post("/api/files", files=files)
+@pytest.mark.anyio
+async def test_upload_file_simple(client):
+    http_client, database = client
+
+    with patch(
+        "routes.files.upload_object",
+        new=AsyncMock(),
+    ):
+        response = await http_client.post(
+            "/api/files",
+            files={"myFile": ("test.txt", BytesIO(b"Test file content"), "text/plain")},
+        )
+
     assert response.status_code == 200
-    
-    data = response.json()
-    assert "file" in data
-    assert "localhost" in data["file"]
+    assert "localhost" in response.json()["file"]
+    assert await database.files.count_documents({}) == 1
 
 
-# Test 3: File upload with password
-def test_upload_file_with_password(client: TestClient):
-    """Test file upload with password protection"""
-    file_content = b"Secret file content"
-    files = {"myFile": ("secret.txt", BytesIO(file_content), "text/plain")}
-    data = {"password": "mysecretpass"}
-    
-    response = client.post("/api/files", files=files, data=data)
+@pytest.mark.anyio
+async def test_upload_file_with_password(client):
+    http_client, database = client
+
+    with patch("routes.files.upload_object", new=AsyncMock()):
+        response = await http_client.post(
+            "/api/files",
+            files={"myFile": ("secret.txt", BytesIO(b"Secret file content"), "text/plain")},
+            data={"password": "mysecretpass"},
+        )
+
     assert response.status_code == 200
-    
-    result = response.json()
-    assert "file" in result
+    document = await database.files.find_one({})
+    assert document["password_hash"]
 
 
-# Test 4: File upload with expiration
-def test_upload_file_with_expiration(client: TestClient):
-    """Test file upload with expiration time"""
-    file_content = b"Temporary file"
-    files = {"myFile": ("temp.txt", BytesIO(file_content), "text/plain")}
-    data = {"expires_in": "60"}  # 60 minutes
-    
-    response = client.post("/api/files", files=files, data=data)
+@pytest.mark.anyio
+async def test_file_metadata(client):
+    http_client, database = client
+    await database.files.insert_one({
+        "uuid": "test-uuid-123",
+        "filename": "test.txt",
+        "object_key": "test-object",
+        "size": 1024,
+        "created_at": datetime.now(timezone.utc),
+        "password_hash": None,
+        "expires_at": None,
+        "max_downloads": None,
+        "download_count": 0,
+    })
+
+    response = await http_client.get("/files/test-uuid-123")
+
     assert response.status_code == 200
-
-
-# Test 5: File upload with download limit
-def test_upload_file_with_max_downloads(client: TestClient):
-    """Test file upload with download limit"""
-    file_content = b"Limited downloads"
-    files = {"myFile": ("limited.txt", BytesIO(file_content), "text/plain")}
-    data = {"max_downloads": "5"}
-    
-    response = client.post("/api/files", files=files, data=data)
-    assert response.status_code == 200
-
-
-# Test 6: Get file metadata
-def test_get_file_metadata(client: TestClient, session: Session):
-    """Test retrieving file metadata"""
-    # Create a test file in database
-    test_file = FileModel(
-        uuid="test-uuid-123",
-        filename="test.txt",
-        path="uploads/test.txt",
-        size=1024,
-    )
-    session.add(test_file)
-    session.commit()
-    
-    response = client.get("/files/test-uuid-123")
-    assert response.status_code == 200
-    
     data = response.json()
     assert data["filename"] == "test.txt"
     assert data["size"] == 1024
     assert "downloadLink" in data
 
 
-# Test 7: Get non-existent file
-def test_get_nonexistent_file(client: TestClient):
-    """Test retrieving file that doesn't exist"""
-    response = client.get("/files/nonexistent-uuid")
+@pytest.mark.anyio
+async def test_nonexistent_file(client):
+    http_client, _ = client
+    response = await http_client.get("/files/nonexistent-uuid")
     assert response.status_code == 404
 
 
-# Test 8: Download without password when required
-def test_download_protected_file_without_password(client: TestClient, session: Session):
-    """Test downloading password-protected file without password"""
-    # Create a password-protected file
-    test_file = FileModel(
-        uuid="protected-uuid",
-        filename="protected.txt",
-        path="uploads/protected.txt",
-        size=1024,
-        password_hash="$argon2id$v=19$m=65536,t=3,p=4$somehash"  # Dummy hash
+@pytest.mark.anyio
+async def test_password_required_for_download(client):
+    http_client, database = client
+    from argon2 import PasswordHasher
+
+    password_hash = PasswordHasher().hash("mysecretpass")
+
+    await database.files.insert_one({
+        "uuid": "protected-uuid",
+        "filename": "protected.txt",
+        "object_key": "protected-object",
+        "size": 1024,
+        "created_at": datetime.now(timezone.utc),
+        "password_hash": password_hash,
+        "expires_at": None,
+        "max_downloads": None,
+        "download_count": 0,
+    })
+
+    response = await http_client.get(
+        "/files/download/protected-uuid",
+        headers={"X-File-Password": "wrong-password"},
     )
-    session.add(test_file)
-    session.commit()
-    
-    response = client.get("/files/download/protected-uuid")
     assert response.status_code == 401
 
 
-# Test 9: File metadata shows protection status
-def test_file_metadata_shows_protection(client: TestClient, session: Session):
-    """Test that metadata indicates if file is password-protected"""
-    test_file = FileModel(
-        uuid="protected-meta-uuid",
-        filename="protected.txt",
-        path="uploads/protected.txt",
-        size=2048,
-        password_hash="$argon2id$v=19$m=65536,t=3,p=4$somehash"
-    )
-    session.add(test_file)
-    session.commit()
-    
-    response = client.get("/files/protected-meta-uuid")
-    assert response.status_code == 200
-    
-    data = response.json()
-    assert data["is_protected"] is True
+@pytest.mark.anyio
+async def test_password_header_allows_download(client):
+    http_client, database = client
+    from argon2 import PasswordHasher
+
+    password_hash = PasswordHasher().hash("mysecretpass")
+
+    await database.files.insert_one({
+        "uuid": "protected-uuid",
+        "filename": "protected.txt",
+        "object_key": "protected-object",
+        "size": 1024,
+        "created_at": datetime.now(timezone.utc),
+        "password_hash": password_hash,
+        "expires_at": None,
+        "max_downloads": None,
+        "download_count": 0,
+    })
+
+    with patch(
+        "routes.files.create_download_url",
+        new=AsyncMock(return_value="https://example.invalid/download"),
+    ):
+        response = await http_client.get(
+            "/files/download/protected-uuid",
+            headers={"X-File-Password": "mysecretpass"},
+        )
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "https://example.invalid/download"
 
 
-# Test 10: Upload without file
-def test_upload_without_file(client: TestClient):
-    """Test upload endpoint without providing a file"""
-    response = client.post("/api/files")
-    assert response.status_code == 422  # Validation error
+@pytest.mark.anyio
+async def test_download_limit_is_enforced(client):
+    http_client, database = client
+    await database.files.insert_one({
+        "uuid": "limited-uuid",
+        "filename": "limited.txt",
+        "object_key": "limited-object",
+        "size": 1024,
+        "created_at": datetime.now(timezone.utc),
+        "password_hash": None,
+        "expires_at": None,
+        "max_downloads": 1,
+        "download_count": 0,
+    })
+
+    with patch(
+        "routes.files.create_download_url",
+        new=AsyncMock(return_value="https://example.invalid/download"),
+    ):
+        first = await http_client.get("/files/download/limited-uuid")
+        second = await http_client.get("/files/download/limited-uuid")
+
+    assert first.status_code == 307
+    assert second.status_code == 403
+
+
+@pytest.mark.anyio
+async def test_expired_file(client):
+    http_client, database = client
+    await database.files.insert_one({
+        "uuid": "expired-uuid",
+        "filename": "expired.txt",
+        "object_key": "expired-object",
+        "size": 1024,
+        "created_at": datetime.now(timezone.utc),
+        "password_hash": None,
+        "expires_at": datetime.now(timezone.utc) - timedelta(minutes=1),
+        "max_downloads": None,
+        "download_count": 0,
+    })
+
+    response = await http_client.get("/files/expired-uuid")
+    assert response.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_cleanup_expired_file(client):
+    _, database = client
+    await database.files.insert_one({
+        "uuid": "cleanup-uuid",
+        "filename": "cleanup.txt",
+        "object_key": "cleanup-object",
+        "size": 1024,
+        "created_at": datetime.now(timezone.utc),
+        "password_hash": None,
+        "expires_at": datetime.now(timezone.utc) - timedelta(minutes=1),
+        "max_downloads": None,
+        "download_count": 0,
+    })
+
+    with patch("cleanup.get_database", return_value=database):
+        with patch(
+            "cleanup.delete_object",
+            new=AsyncMock(),
+        ) as delete_object:
+            from cleanup import cleanup_expired_files
+
+            deleted_count = await cleanup_expired_files()
+
+    assert deleted_count == 1
+    delete_object.assert_awaited_once_with("cleanup-object")
+    assert await database.files.find_one({"uuid": "cleanup-uuid"}) is None
+
+
+@pytest.mark.anyio
+async def test_upload_without_file(client):
+    http_client, _ = client
+    response = await http_client.post("/api/files")
+    assert response.status_code == 422

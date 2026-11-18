@@ -1,19 +1,19 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import files
 import os
 from dotenv import load_dotenv
-
 load_dotenv()
 
+from routes import files
 from contextlib import asynccontextmanager
-from database import create_db_and_tables
+from database import connect_to_mongodb, close_mongodb_connection
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_db_and_tables()
+    await connect_to_mongodb()
     yield
+    await close_mongodb_connection()
 
 app = FastAPI(
     title="DropLink API",
@@ -49,10 +49,17 @@ All passwords are hashed using Argon2, and files can be automatically deleted af
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:5173",
+        ).split(",")
+        if origin.strip()
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-File-Password"],
 )
 
 app.include_router(files.router)
