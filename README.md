@@ -25,7 +25,6 @@ A full-stack file sharing application with password protection, expiration contr
 - **React 19** - UI library
 - **TypeScript** - Type-safe JavaScript
 - **Vite** - Build tool
-- **TanStack Router** - Type-safe routing
 - **Tailwind CSS** - Utility-first CSS framework
 - **React Dropzone** - File upload component
 - **QRCode.react** - QR code generation
@@ -98,8 +97,7 @@ filesharingapp/
     ├── src/
     │   ├── pages/           # Page components
     │   ├── components/      # Reusable components
-    │   ├── context/         # React contexts
-    │   └── routes/          # Route definitions
+    │   └── context/         # React contexts
     └── public/              # Static assets
 ```
 

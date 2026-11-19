@@ -105,6 +105,33 @@ async def test_nonexistent_file(client):
     assert response.status_code == 404
 
 @pytest.mark.anyio
+async def test_protected_file_hides_filename_without_password(client):
+    http_client, database = client
+    password_hash = PasswordHasher().hash("mysecretpass")
+    await database.files.insert_one({
+        "uuid": "hidden-name-uuid",
+        "filename": "secret-name.txt",
+        "object_key": "hidden-object",
+        "size": 1024,
+        "created_at": datetime.now(timezone.utc),
+        "password_hash": password_hash,
+        "expires_at": None,
+        "max_downloads": None,
+        "download_count": 0,
+    })
+    locked = await http_client.get("/files/hidden-name-uuid")
+    assert locked.status_code == 200
+    assert locked.json()["filename"] is None
+    assert locked.json()["is_protected"] is True
+
+    wrong = await http_client.get("/files/hidden-name-uuid", headers={"X-File-Password": "wrong"})
+    assert wrong.status_code == 401
+
+    unlocked = await http_client.get("/files/hidden-name-uuid", headers={"X-File-Password": "mysecretpass"})
+    assert unlocked.status_code == 200
+    assert unlocked.json()["filename"] == "secret-name.txt"
+
+@pytest.mark.anyio
 async def test_password_required_for_download(client):
     http_client, database = client
     password_hash = PasswordHasher().hash("mysecretpass")

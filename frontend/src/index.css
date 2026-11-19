@@ -23,11 +23,13 @@
     @apply bg-[#f4f5f1] text-[#171917];
   }
 
+  a,
   button,
   input {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67d8cc] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111312];
   }
 
+  .light a,
   .light button,
   .light input {
     @apply focus-visible:ring-offset-[#f4f5f1];
@@ -44,7 +46,7 @@
   }
 
   .text-muted {
-    color: #777e79;
+    color: #8d958f;
   }
 
   .text-accent {
@@ -105,6 +107,10 @@
     @apply inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#67d8cc] px-5 text-sm font-medium text-[#102320] transition-colors duration-150 hover:bg-[#86e4da] disabled:cursor-not-allowed disabled:opacity-50;
   }
 
+  .light .btn-primary {
+    @apply bg-[#147c72] text-[#fbfcf8] hover:bg-[#11685f];
+  }
+
   .btn-secondary {
     @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#1b1e1c] px-4 text-sm font-medium text-[#e8ebe6] transition-colors duration-150 hover:bg-[#242826];
   }
@@ -119,22 +125,9 @@
     @apply overflow-hidden rounded-2xl border border-white/[0.08] bg-[#1a1d1b];
   }
 
-  .transfer-receipt::after {
-    content: "";
-    position: absolute;
-    right: 0;
-    bottom: 96px;
-    left: 0;
-    border-top: 1px dashed rgba(244, 246, 243, 0.14);
-  }
-
   .light .transfer-receipt {
     color: #171917;
     @apply border-[#dfe3dc] bg-[#fdfefa];
-  }
-
-  .light .transfer-receipt::after {
-    border-top-color: rgba(23, 25, 23, 0.14);
   }
 
   .field {

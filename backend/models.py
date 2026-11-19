@@ -6,7 +6,7 @@ class FileResponse(BaseModel):
     uuid: str
 
 class FileDetailsResponse(BaseModel):
-    filename: str
+    filename: str | None = None
     size: int
     createdAt: datetime
     downloadLink: str

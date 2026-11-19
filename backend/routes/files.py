@@ -137,14 +137,21 @@ async def upload_file(
     return {"file": f"{APP_BASE_URL}/files/{file_uuid}", "uuid": file_uuid}
 
 @router.get("/files/{uuid}", response_model=FileDetailsResponse)
-async def show_file(uuid: str, db: AsyncDatabase = Depends(get_database)):
+async def show_file(
+    uuid: str,
+    password: str | None = Header(default=None, alias="X-File-Password"),
+    db: AsyncDatabase = Depends(get_database),
+):
     file = await _get_active_file(db, uuid, not_found_detail="Link has been expired.", limit_status=404)
+    is_protected = bool(file.get("password_hash"))
+    if is_protected and password:
+        _verify_password(file, password)
     return {
-        "filename": file["filename"],
+        "filename": None if (is_protected and not password) else file["filename"],
         "size": file["size"],
         "createdAt": file["created_at"],
         "downloadLink": f"{APP_BASE_URL}/files/download/{uuid}",
-        "is_protected": bool(file.get("password_hash")),
+        "is_protected": is_protected,
     }
 
 @router.get("/files/preview/{uuid}")

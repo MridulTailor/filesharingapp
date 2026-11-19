@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams } from '@tanstack/react-router';
 import axios from 'axios';
 import { Download, Eye, FileText, LockKeyhole, X } from 'lucide-react';
 import { api } from '../api';
+import { formatFileSize } from '../format';
 
 type FileInfo = {
-  filename: string;
+  filename: string | null;
   size: number;
   createdAt: string;
   downloadLink: string;
@@ -19,11 +19,13 @@ function getErrorDetail(err: unknown): string | undefined {
   return (err.response?.data as { detail?: string } | undefined)?.detail;
 }
 
-export const DownloadPage = () => {
-  const { uuid } = useParams({ from: '/files/$uuid' });
+export const DownloadPage = ({ uuid }: { uuid: string }) => {
   const [password, setPassword] = useState('');
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,13 +57,37 @@ export const DownloadPage = () => {
     };
   }, [uuid]);
 
-  const lowerFilename = fileInfo?.filename.toLowerCase() ?? '';
+  const isLocked = Boolean(fileInfo?.is_protected && !fileInfo.filename);
+  const lowerFilename = fileInfo?.filename?.toLowerCase() ?? '';
   const isImage = IMAGE_EXTENSIONS.some((ext) => lowerFilename.endsWith(ext));
   const isPDF = lowerFilename.endsWith('.pdf');
-  const canPreview = isImage || isPDF;
+  const canPreview = !isLocked && (isImage || isPDF);
+
+  const handleUnlock = async () => {
+    if (!password) {
+      setDownloadError('Password is required for this file.');
+      return;
+    }
+    setIsUnlocking(true);
+    setDownloadError(null);
+    try {
+      const response = await api.get(`/files/${uuid}`, {
+        headers: { 'X-File-Password': password },
+      });
+      setFileInfo(response.data);
+    } catch (err: unknown) {
+      setDownloadError(
+        axios.isAxiosError(err) && err.response?.status === 401
+          ? 'Incorrect password.'
+          : getErrorDetail(err) || 'Failed to unlock transfer.',
+      );
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
 
   const handleDownload = async () => {
-    if (!fileInfo?.downloadLink) return;
+    if (!fileInfo) return;
     if (fileInfo.is_protected && !password) {
       setDownloadError('Password is required for this file.');
       return;
@@ -70,6 +96,8 @@ export const DownloadPage = () => {
       window.location.href = `${api.defaults.baseURL}/files/download/${uuid}`;
       return;
     }
+    setIsDownloading(true);
+    setDownloadError(null);
     try {
       const response = await api.get(`/files/download/${uuid}`, {
         headers: { 'X-File-Password': password },
@@ -78,12 +106,11 @@ export const DownloadPage = () => {
       const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', fileInfo.filename);
+      link.setAttribute('download', fileInfo.filename || 'download');
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(downloadUrl);
-      setDownloadError(null);
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         setDownloadError('Incorrect password.');
@@ -92,10 +119,13 @@ export const DownloadPage = () => {
       } else {
         setDownloadError('Download failed.');
       }
+    } finally {
+      setIsDownloading(false);
     }
   };
 
   const handlePreview = async () => {
+    if (isLocked) return;
     if (showPreview) {
       setShowPreview(false);
       if (previewUrl) {
@@ -106,7 +136,7 @@ export const DownloadPage = () => {
     }
     setShowPreview(true);
     setDownloadError(null);
-    if (fileInfo?.is_protected && !password) return;
+    setIsPreviewLoading(true);
     try {
       const response = await api.get(`/files/preview/${uuid}`, {
         headers: fileInfo?.is_protected ? { 'X-File-Password': password } : undefined,
@@ -122,6 +152,8 @@ export const DownloadPage = () => {
           ? 'Incorrect password.'
           : 'Failed to load preview',
       );
+    } finally {
+      setIsPreviewLoading(false);
     }
   };
 
@@ -129,14 +161,16 @@ export const DownloadPage = () => {
     <div className="w-full max-w-2xl py-10 sm:py-16">
       <div className="mb-8">
         <p className="text-accent mb-3 text-sm font-medium">Incoming transfer</p>
-        <h1 className="text-primary text-3xl font-semibold tracking-tight">File ready</h1>
+        <h1 className="text-primary text-3xl font-semibold tracking-tight">
+          {isLocked ? 'Protected transfer' : 'File ready'}
+        </h1>
       </div>
 
       <div className="transfer-receipt p-5 sm:p-8">
         {isLoading ? (
-          <div className="text-muted flex h-48 items-center justify-center text-sm">Loading transfer</div>
+          <div className="text-muted flex h-48 items-center justify-center text-sm">Loading transfer...</div>
         ) : error ? (
-          <div className="rounded-xl border border-[#d66a62]/20 bg-[#d66a62]/10 p-5 text-[#a94b45] light:text-[#7d2f2a]">
+          <div className="rounded-xl border border-[#d66a62]/25 bg-[#d66a62]/10 p-5 text-[#f08b84] light:text-[#8f2f29]">
             <p className="font-medium">Transfer unavailable</p>
             <p className="text-sm mt-1">
               {getErrorDetail(error) || 'This transfer may have expired or reached its download limit.'}
@@ -147,11 +181,13 @@ export const DownloadPage = () => {
             <div className="hairline flex items-start justify-between border-b pb-5">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="text-accent hairline grid h-10 w-10 shrink-0 place-items-center rounded-lg border">
-                  <FileText size={18} strokeWidth={1.5} />
+                  {isLocked ? <LockKeyhole size={18} strokeWidth={1.5} /> : <FileText size={18} strokeWidth={1.5} />}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-primary truncate font-medium">{fileInfo.filename}</p>
-                  <p className="text-muted mt-1 font-mono text-xs">{(fileInfo.size / 1024 / 1024).toFixed(2)} MB</p>
+                  <p className="text-primary truncate font-medium">
+                    {isLocked ? 'Password required to view file' : fileInfo.filename}
+                  </p>
+                  <p className="text-muted mt-1 font-mono text-xs">{formatFileSize(fileInfo.size)}</p>
                 </div>
               </div>
               {fileInfo.is_protected && (
@@ -183,12 +219,12 @@ export const DownloadPage = () => {
                 </button>
                 {showPreview && (
                   <div className="rounded-xl border border-white/[0.08] bg-black/10 p-3 light:border-[#dfe3dc] light:bg-[#f4f5f1]">
-                    {!password && fileInfo.is_protected ? (
-                      <p className="text-muted py-8 text-center text-sm">Enter the password to preview</p>
+                    {isPreviewLoading ? (
+                      <p className="text-muted py-8 text-center text-sm">Loading preview...</p>
                     ) : previewUrl && isImage ? (
                       <img
                         src={previewUrl}
-                        alt={fileInfo.filename}
+                        alt={fileInfo.filename ?? 'Preview'}
                         className="max-h-[480px] w-full rounded-lg object-contain"
                         onError={() => setDownloadError('Failed to load preview')}
                       />
@@ -200,7 +236,7 @@ export const DownloadPage = () => {
               </div>
             )}
 
-            {fileInfo.is_protected && (
+            {isLocked && (
               <div>
                 <label className="text-muted mb-2 block text-xs">Password</label>
                 <input
@@ -208,21 +244,33 @@ export const DownloadPage = () => {
                   placeholder="Enter transfer password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
                   className="field"
                 />
               </div>
             )}
 
             {downloadError && (
-              <div className="rounded-lg border border-[#d66a62]/20 bg-[#d66a62]/10 p-3 text-sm text-[#a94b45] light:text-[#7d2f2a]">
+              <div className="rounded-lg border border-[#d66a62]/25 bg-[#d66a62]/10 p-3 text-sm text-[#f08b84] light:text-[#8f2f29]">
                 {downloadError}
               </div>
             )}
 
-            <button onClick={handleDownload} className="w-full btn-primary flex items-center justify-center gap-2 group">
-              <Download size={16} strokeWidth={1.5} />
-              {fileInfo.is_protected ? 'Unlock and download' : 'Download file'}
-            </button>
+            {isLocked ? (
+              <button onClick={handleUnlock} disabled={isUnlocking} className="btn-primary w-full">
+                <LockKeyhole size={16} strokeWidth={1.5} />
+                {isUnlocking ? 'Unlocking...' : 'Unlock'}
+              </button>
+            ) : (
+              <button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="btn-primary w-full"
+              >
+                <Download size={16} strokeWidth={1.5} />
+                {isDownloading ? 'Downloading...' : 'Download file'}
+              </button>
+            )}
           </div>
         ) : null}
       </div>

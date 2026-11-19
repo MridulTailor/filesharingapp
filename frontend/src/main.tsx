@@ -1,25 +1,22 @@
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
-import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { ThemeProvider } from './context/ThemeContext';
-import { routeTree } from './routeTree.gen';
+import { Navbar } from './components/Navbar';
+import { DownloadPage } from './components/DownloadPage';
+import { Home } from './pages/Home';
 import './index.css';
 
-const router = createRouter({ routeTree });
+const fileMatch = window.location.pathname.match(/^\/files\/([^/]+)\/?$/);
 
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router;
-  }
-}
-
-const rootElement = document.getElementById('root')!;
-if (!rootElement.innerHTML) {
-  ReactDOM.createRoot(rootElement).render(
-    <StrictMode>
-      <ThemeProvider>
-        <RouterProvider router={router} />
-      </ThemeProvider>
-    </StrictMode>,
-  );
-}
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ThemeProvider>
+      <div className="surface-page flex min-h-screen flex-col">
+        <Navbar showNewTransfer={Boolean(fileMatch)} />
+        <main className="flex w-full flex-1 justify-center px-4 sm:px-6 lg:px-8">
+          {fileMatch ? <DownloadPage uuid={decodeURIComponent(fileMatch[1])} /> : <Home />}
+        </main>
+      </div>
+    </ThemeProvider>
+  </StrictMode>,
+);
