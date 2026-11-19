@@ -184,7 +184,10 @@ async def test_download_limit_is_enforced(client):
         "max_downloads": 1,
         "download_count": 0,
     })
-    with patch("routes.files.get_object_stream", new=_mock_stream()):
+    with (
+        patch("routes.files.get_object_stream", new=_mock_stream()),
+        patch("routes.files.delete_object", new=AsyncMock()),
+    ):
         first = await http_client.get("/files/download/limited-uuid")
         second = await http_client.get("/files/download/limited-uuid")
     assert first.status_code == 200
