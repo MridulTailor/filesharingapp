@@ -67,7 +67,7 @@ export const DownloadPage = () => {
       return;
     }
     if (!fileInfo.is_protected) {
-      window.location.href = fileInfo.downloadLink;
+      window.location.href = `${api.defaults.baseURL}/files/download/${uuid}`;
       return;
     }
     try {
