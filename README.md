@@ -60,9 +60,11 @@ Frontend will be available at `http://localhost:5173`.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/files` | Upload file with optional protection |
-| `GET` | `/files/{uuid}` | Get file metadata |
-| `GET` | `/files/download/{uuid}` | Download file |
-| `GET` | `/files/preview/{uuid}` | Preview image/PDF |
+| `GET` | `/files/{uuid}` | Get file metadata (hides filename when locked) |
+| `GET` | `/files/download/{uuid}` | Stream file download |
+| `GET` | `/files/preview/{uuid}` | Stream image/PDF preview |
+| `GET` | `/health/live` | Liveness check |
+| `GET` | `/health/ready` | Readiness check (MongoDB ping) |
 
 ## Testing
 
@@ -95,10 +97,10 @@ filesharingapp/
 │   └── tests/               # Backend tests
 └── frontend/
     ├── src/
-    │   ├── pages/           # Page components
-    │   ├── components/      # Reusable components
-    │   └── context/         # React contexts
-    └── public/              # Static assets
+    │   ├── pages/           # Home page
+    │   ├── components/      # Upload, download, navbar, background
+    │   └── context/         # Theme context
+    └── vercel.json          # SPA rewrite rules
 ```
 
 ## Environment Variables
