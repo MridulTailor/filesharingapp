@@ -3,6 +3,8 @@ from pydantic import BaseModel
 
 class FileResponse(BaseModel):
     file: str
+    uuid: str
+
 class FileDetailsResponse(BaseModel):
     filename: str
     size: int
