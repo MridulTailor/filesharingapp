@@ -104,7 +104,6 @@ export const DownloadPage = () => {
             }
 
         } catch (err: unknown) {
-            console.error("Download error:", err);
             if (axios.isAxiosError(err) && err.response?.status === 401) {
                 setDownloadError("Incorrect password.");
             } else if (axios.isAxiosError(err) && err.response?.status === 404) {

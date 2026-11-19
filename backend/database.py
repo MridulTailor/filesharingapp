@@ -19,6 +19,7 @@ async def connect_to_mongodb() -> None:
 
     await _database.files.create_index("uuid", unique=True)
     await _database.files.create_index("expires_at", expireAfterSeconds=0)
+    await _database.files.create_index("cleanup_after", expireAfterSeconds=0)
 
 async def close_mongodb_connection() -> None:
     global _client, _database

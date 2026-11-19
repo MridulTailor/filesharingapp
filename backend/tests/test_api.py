@@ -23,10 +23,7 @@ def anyio_backend():
 @pytest.fixture
 def mongo_database():
     mongo_url = os.environ["MONGODB_URL"]
-    database_name = os.getenv(
-        "MONGODB_TEST_DATABASE",
-        "filesharing_test",
-    )
+    database_name = os.environ["MONGODB_DATABASE"]
     client = AsyncMongoClient(mongo_url)
     database = client.get_database(database_name)
     return client, database
@@ -56,6 +53,15 @@ async def test_read_root(client):
     http_client, _ = client
     response = await http_client.get("/")
     assert response.status_code in [200, 404]
+
+
+@pytest.mark.anyio
+async def test_liveness(client):
+    http_client, _ = client
+    response = await http_client.get("/health/live")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+    assert response.headers["x-request-id"]
 
 
 @pytest.mark.anyio
@@ -222,8 +228,37 @@ async def test_expired_file(client):
         "download_count": 0,
     })
 
-    response = await http_client.get("/files/expired-uuid")
+    with patch("routes.files.delete_object", new=AsyncMock()):
+        response = await http_client.get("/files/expired-uuid")
     assert response.status_code == 404
+    assert await database.files.find_one({"uuid": "expired-uuid"}) is None
+
+
+@pytest.mark.anyio
+async def test_download_limit_sets_cleanup_grace(client):
+    http_client, database = client
+    await database.files.insert_one({
+        "uuid": "grace-uuid",
+        "filename": "grace.txt",
+        "object_key": "grace-object",
+        "size": 1024,
+        "created_at": datetime.now(timezone.utc),
+        "password_hash": None,
+        "expires_at": None,
+        "max_downloads": 1,
+        "download_count": 0,
+    })
+
+    with patch(
+        "routes.files.create_download_url",
+        new=AsyncMock(return_value="https://example.invalid/download"),
+    ):
+        response = await http_client.get("/files/download/grace-uuid")
+
+    assert response.status_code == 307
+    document = await database.files.find_one({"uuid": "grace-uuid"})
+    assert document["download_count"] == 1
+    assert document["cleanup_after"] is not None
 
 
 @pytest.mark.anyio
@@ -259,4 +294,37 @@ async def test_cleanup_expired_file(client):
 async def test_upload_without_file(client):
     http_client, _ = client
     response = await http_client.post("/api/files")
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_invalid_expiration(client):
+    http_client, _ = client
+    response = await http_client.post(
+        "/api/files",
+        files={"myFile": ("test.txt", BytesIO(b"Test file"), "text/plain")},
+        data={"expires_in": "0"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_expiration_over_30_days(client):
+    http_client, _ = client
+    response = await http_client.post(
+        "/api/files",
+        files={"myFile": ("test.txt", BytesIO(b"Test file"), "text/plain")},
+        data={"expires_in": str(60 * 24 * 30 + 1)},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_upload_rejects_invalid_download_limit(client):
+    http_client, _ = client
+    response = await http_client.post(
+        "/api/files",
+        files={"myFile": ("test.txt", BytesIO(b"Test file"), "text/plain")},
+        data={"max_downloads": "0"},
+    )
     assert response.status_code == 422

@@ -47,7 +47,13 @@ jobs:
         PORT: 3001
         MONGODB_URL: ${{ secrets.MONGODB_TEST_URL }}
         MONGODB_DATABASE: filesharing_test
-        MONGODB_TEST_DATABASE: filesharing_test
+        ENVIRONMENT: test
+        R2_ENDPOINT: https://example.invalid
+        R2_ACCESS_KEY_ID: test
+        R2_SECRET_ACCESS_KEY: test
+        R2_BUCKET: test
+        R2_REGION: auto
+        CORS_ORIGINS: http://localhost:5173
 
     - name: Generate coverage report
       if: success()
@@ -59,7 +65,13 @@ jobs:
         PORT: 3001
         MONGODB_URL: ${{ secrets.MONGODB_TEST_URL }}
         MONGODB_DATABASE: filesharing_test
-        MONGODB_TEST_DATABASE: filesharing_test
+        ENVIRONMENT: test
+        R2_ENDPOINT: https://example.invalid
+        R2_ACCESS_KEY_ID: test
+        R2_SECRET_ACCESS_KEY: test
+        R2_BUCKET: test
+        R2_REGION: auto
+        CORS_ORIGINS: http://localhost:5173
 
     - name: Upload coverage reports
       if: success()

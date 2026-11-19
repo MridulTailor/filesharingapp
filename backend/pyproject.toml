@@ -10,6 +10,7 @@ dependencies = [
     "pymongo>=4.20.0",
     "python-dotenv>=1.2.4",
     "python-multipart>=0.0.33",
+    "slowapi>=0.1.10",
     "uvicorn>=0.54.0",
 ]
 

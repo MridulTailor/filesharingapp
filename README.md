@@ -148,7 +148,6 @@ cp .env.example .env
 **Required Variables:**
 - `MONGODB_URL` - MongoDB connection string
 - `MONGODB_DATABASE` - MongoDB database name
-- `MONGODB_TEST_DATABASE` - MongoDB database used by tests
 - `APP_BASE_URL` - Base URL for the application (default: `http://localhost:3001`)
 - `PORT` - Port for the backend server (default: `3001`)
 - `R2_ENDPOINT` - Cloudflare R2 S3-compatible endpoint
@@ -157,3 +156,37 @@ cp .env.example .env
 - `R2_BUCKET` - R2 bucket name
 - `R2_REGION` - R2 signing region (default: `auto`)
 - `CORS_ORIGINS` - Allowed CORS origins (default: `http://localhost:5173`)
+
+## Production deployment
+
+Set these variables in your hosting platform's environment or secret settings.
+
+**Backend**
+
+```env
+ENVIRONMENT=production
+MONGODB_URL=mongodb+srv://...
+MONGODB_DATABASE=filesharing
+APP_BASE_URL=https://api.example.com
+PORT=3001
+FORWARDED_ALLOW_IPS=*
+CORS_ORIGINS=https://app.example.com
+MAX_FILE_SIZE_MB=100
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=
+R2_REGION=auto
+```
+
+Start the backend with:
+
+```bash
+uv --directory backend run --locked --no-dev uvicorn main:app --host 0.0.0.0 --port 3001 --proxy-headers --forwarded-allow-ips '*'
+```
+
+**Frontend**
+
+```env
+VITE_API_URL=https://api.example.com
+```

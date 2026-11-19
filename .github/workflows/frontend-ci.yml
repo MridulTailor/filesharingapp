@@ -36,7 +36,6 @@ jobs:
     
     - name: Run ESLint
       run: npm run lint
-      continue-on-error: true
     
     - name: Type check
       run: npx tsc --noEmit
@@ -45,6 +44,7 @@ jobs:
       run: npm run build
       env:
         NODE_ENV: production
+        VITE_API_URL: https://api.example.invalid
     
     - name: Upload build artifacts
       if: success()

@@ -172,6 +172,8 @@ export const UploadPage = () => {
                                 <input 
                                     type="number" 
                                     placeholder="Minutes"
+                                    min="1"
+                                    max="43200"
                                     value={expiresIn}
                                     onChange={(e) => setExpiresIn(e.target.value)}
                                     className="field"
