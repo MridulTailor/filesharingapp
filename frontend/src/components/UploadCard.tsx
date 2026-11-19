@@ -95,8 +95,8 @@ export const UploadCard = () => {
           {...getRootProps()}
           className={`relative cursor-pointer rounded-xl border border-dashed p-8 text-center transition-colors duration-150 ${
             isDragActive
-              ? 'border-[#67d8cc] bg-[#67d8cc]/[0.06] light:border-[#147c72] light:bg-[#147c72]/[0.06]'
-              : 'border-white/15 hover:border-white/25 light:border-[#cfd5c9] light:hover:border-[#aeb7a7]'
+              ? 'border-[var(--accent)] bg-[var(--accent-tint)]'
+              : 'border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
           }`}
         >
           <input {...getInputProps()} />
@@ -139,7 +139,7 @@ export const UploadCard = () => {
             {showAdvanced ? <ChevronUp size={16} strokeWidth={1.5} /> : <ChevronDown size={16} strokeWidth={1.5} />}
           </button>
           {showAdvanced && (
-            <div className="mt-2 grid gap-3 rounded-xl border border-white/[0.08] bg-black/10 p-4 sm:grid-cols-2 light:border-[#dfe3dc] light:bg-[#f4f5f1]">
+            <div className="surface-subtle hairline mt-2 grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
               <div>
                 <label className="text-muted mb-1.5 block text-xs">Password protection</label>
                 <input
@@ -173,8 +173,8 @@ export const UploadCard = () => {
                         onClick={() => setExpiresIn(preset.minutes)}
                         className={`rounded-md px-2 py-0.5 font-mono text-xs transition-colors ${
                           expiresIn === preset.minutes
-                            ? 'bg-[#67d8cc]/20 text-[#67d8cc] light:bg-[#147c72]/15 light:text-[#147c72]'
-                            : 'text-muted hover:text-primary bg-white/[0.05] light:bg-[#e7eae3]'
+                            ? 'bg-[var(--accent-tint)] text-accent'
+                            : 'text-muted hover:text-primary surface-raised'
                         }`}
                       >
                         {preset.label}
@@ -205,9 +205,9 @@ export const UploadCard = () => {
         )}
 
         {isUploading && (
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08] light:bg-[#dfe3dc]">
+          <div className="surface-subtle h-1.5 w-full overflow-hidden rounded-full">
             <div
-              className="h-full rounded-full bg-[#67d8cc] transition-[width] duration-150"
+              className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-150"
               style={{ width: `${uploadProgress}%` }}
             />
           </div>
@@ -220,12 +220,12 @@ export const UploadCard = () => {
               Transfer ready
             </div>
             <div className="flex justify-center py-2">
-              <div className="rounded-xl bg-[#f4f6f3] p-4">
+              <div className="rounded-xl bg-white p-4">
                 <QRCodeSVG value={fileLink} size={172} />
               </div>
             </div>
             <p className="text-muted text-center text-xs">Scan to open transfer</p>
-            <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-black/10 p-3 light:border-[#dfe3dc] light:bg-white">
+            <div className="surface-subtle hairline flex items-center gap-2 rounded-lg border p-3">
               <code className="text-secondary flex-1 truncate font-mono text-xs">{fileLink}</code>
               <button onClick={handleCopy} className="btn-secondary h-8 px-3 text-xs">
                 {isCopied ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
@@ -238,11 +238,7 @@ export const UploadCard = () => {
           </div>
         )}
 
-        {error && (
-          <div className="rounded-lg border border-[#d66a62]/25 bg-[#d66a62]/10 p-3 text-center text-sm text-[#f08b84] light:text-[#8f2f29]">
-            {error}
-          </div>
-        )}
+        {error && <div className="alert-error text-center">{error}</div>}
       </div>
     </div>
   );

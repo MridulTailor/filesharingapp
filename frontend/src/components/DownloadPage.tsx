@@ -170,7 +170,7 @@ export const DownloadPage = ({ uuid }: { uuid: string }) => {
         {isLoading ? (
           <div className="text-muted flex h-48 items-center justify-center text-sm">Loading transfer...</div>
         ) : error ? (
-          <div className="rounded-xl border border-[#d66a62]/25 bg-[#d66a62]/10 p-5 text-[#f08b84] light:text-[#8f2f29]">
+          <div className="alert-error p-5">
             <p className="font-medium">Transfer unavailable</p>
             <p className="text-sm mt-1">
               {getErrorDetail(error) || 'This transfer may have expired or reached its download limit.'}
@@ -218,7 +218,7 @@ export const DownloadPage = ({ uuid }: { uuid: string }) => {
                   {showPreview ? 'Close preview' : 'Preview'}
                 </button>
                 {showPreview && (
-                  <div className="rounded-xl border border-white/[0.08] bg-black/10 p-3 light:border-[#dfe3dc] light:bg-[#f4f5f1]">
+                  <div className="surface-subtle hairline rounded-xl border p-3">
                     {isPreviewLoading ? (
                       <p className="text-muted py-8 text-center text-sm">Loading preview...</p>
                     ) : previewUrl && isImage ? (
@@ -250,11 +250,7 @@ export const DownloadPage = ({ uuid }: { uuid: string }) => {
               </div>
             )}
 
-            {downloadError && (
-              <div className="rounded-lg border border-[#d66a62]/25 bg-[#d66a62]/10 p-3 text-sm text-[#f08b84] light:text-[#8f2f29]">
-                {downloadError}
-              </div>
-            )}
+            {downloadError && <div className="alert-error">{downloadError}</div>}
 
             {isLocked ? (
               <button onClick={handleUnlock} disabled={isUnlocking} className="btn-primary w-full">
