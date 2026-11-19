@@ -1,5 +1,8 @@
 # DropLink - Secure File Sharing
 
+[![Backend CI](https://github.com/MridulTailor/filesharingapp/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/MridulTailor/filesharingapp/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/MridulTailor/filesharingapp/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/MridulTailor/filesharingapp/actions/workflows/frontend-ci.yml)
+
 A full-stack file sharing application with password protection, expiration controls, download limits, and QR code generation.
 
 ## Features
